@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="66a90e87-be28-4400-bea8-aa515682d66e" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="0b0cf046-a992-4088-acbb-29537439ed71" >
+		<http:request-connection protocol="HTTPS" host="us-central1-aiplatform.googleapis.com" port="443" />
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="b9baf9f7-ca08-4ddc-9f13-93a690fce35e" file="properties.yaml" />
+	<flow name="google-ai-exampleFlow" doc:id="a6ec7427-61ab-41b7-8998-613fd0966a61" >
+		<http:listener doc:name="Listener" doc:id="ea6562eb-0d87-4cbd-96b7-8223b9b80691" config-ref="HTTP_Listener_config" path="/llm"/>
+		<set-variable value="${bearerToken}" doc:name="Set Variable Bearer Token" doc:id="7f80f5eb-c8e8-43ba-870a-39895c60fcc6" variableName="Bearer token"/>
+		<ee:transform doc:name="Transform Message" doc:id="f448a182-1ed4-420c-a21d-9e22ae569fb5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "contents": {
+        "role": "user",
+        "parts": {
+            "text": "Give me a recipe for baked Alaska."
+        }
+    },
+    "safety_settings": {
+        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "threshold": "BLOCK_LOW_AND_ABOVE"
+    },
+    "generation_config": {
+        "temperature": 0.2,
+        "topP": 0.8,
+        "topK": 40
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="bcb8b123-5557-4591-a9e8-8f8deee7ec84" message="#[payload]"/>
+		<http:request method="POST" doc:name="Request" doc:id="0203ad0d-a273-49fc-8ad3-356f4d8a8dc3" config-ref="HTTP_Request_configuration" path="/v1/projects/${projectId}/locations/${location}/publishers/google/models/gemini-1.0-pro:generateContent">
+			<http:headers ><![CDATA[#[{
+        Authorization: "Bearer " ++ vars."Bearer token"
+    }]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="e2efe194-6c91-413c-9a4a-96e1a962f9b5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
